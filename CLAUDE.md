@@ -1,0 +1,43 @@
+# Agentic Storefront — Track 01 Build
+
+Full spec lives in `docs/`. Read the relevant doc before touching a module — don't rely on this file alone.
+
+- `docs/track1-context.md` — why this track, protocol context (ACP/AP2/UAP/x402), judging rubric.
+- `docs/track1-agentic-storefront-architecture.md` — the actual spec: component diagram, sequence diagram, data model, TypeScript interfaces, build order (section 5).
+
+## Non-negotiable design rule
+
+The LLM never calls Razorpay directly. It only proposes actions (via `search_catalog` / `propose_cart` tools). Every proposal must pass through the Policy Engine (pure TypeScript, no model call) before the Razorpay Adapter executes anything. Do not add a tool that lets the model charge a card, issue a refund, or bypass the policy check — this is the core architectural claim of the whole project and it must hold structurally, not just by convention.
+
+## Build order (see architecture doc section 5 for full detail)
+
+1. Catalog service (in-memory or Mongo — see current phase decision below)
+2. Policy Engine — pure functions, unit-tested, zero LLM/network calls
+3. Mandate Ledger — hash-chained append-only records + a `verifyChain()` script
+4. Razorpay Adapter — typed wrapper around Orders/Payments/Refunds (test mode only)
+5. Agent Orchestrator — OpenAI tool-use loop, narrow read-heavy tool set
+6. Failure Injector — staged decline/out-of-stock/cap-breach + recovery flow
+7. Admin/Audit Dashboard — live ledger view, policy-decision feed, consent revoke
+
+Work one phase at a time. Commit when a phase's own tests pass before starting the next.
+
+## Stack
+
+- Backend: Node.js + TypeScript
+- Frontend: React + TypeScript
+- DB: MongoDB (or in-memory for a fast first pass — confirm which before scaffolding)
+- LLM: OpenAI API, tool use / function calling (deviates from `docs/` spec, which specifies Claude — see note below)
+- Payments: Razorpay Node SDK, test-mode keys only
+
+## Deviation from docs/
+
+The architecture and context docs specify Claude for the Agent Orchestrator's tool-use loop (and `docs/track1-context.md` leans on the real Razorpay/NPCI-on-Claude pilot as pitch narrative). This project uses **OpenAI** instead — a deliberate choice made outside the doc, not an error. If you're writing the README's architecture-decision section, call this out explicitly rather than silently following the doc's wording.
+
+## Secrets
+
+Real keys live in `.env.local`, never in code, never in a commit. See `.env.example` for the required variable names. Do not read or print `.env.local` contents.
+
+## Current phase
+
+<!-- update this line as you progress, e.g. "Phase 2: Policy Engine — in progress" -->
+Phase 1: Catalog service — done (backend scaffolded, 18 SKUs seeded to MongoDB Atlas, `/catalog/feed.json` and `/catalog/agent-meta/:sku` verified live). Phase 2: Policy Engine + Mandate Ledger — not started.
