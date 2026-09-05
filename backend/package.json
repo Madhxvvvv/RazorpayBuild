@@ -10,6 +10,7 @@
     "seed": "tsx src/seed/products.seed.ts",
     "verify-chain": "tsx src/ledger/verify-chain.script.ts",
     "razorpay:live-check": "tsx src/razorpay/live-check.script.ts",
+    "seed-demo-activity": "tsx src/orchestrator/seed-demo-activity.script.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
