@@ -4,6 +4,7 @@ import express from "express";
 import { fileURLToPath } from "node:url";
 import { resolve, dirname } from "node:path";
 import { connectDb } from "./db/connection.js";
+import { adminRouter } from "./admin/admin.routes.js";
 import { catalogRouter } from "./catalog/catalog.routes.js";
 import { consentRouter } from "./consent/consent.routes.js";
 import { createOpenAiClient } from "./orchestrator/openai-client.js";
@@ -30,6 +31,7 @@ app.get("/health", (_req, res) => {
 
 app.use("/catalog", catalogRouter);
 app.use("/consent", consentRouter);
+app.use("/admin", adminRouter);
 
 async function main() {
   await connectDb(MONGODB_URI);

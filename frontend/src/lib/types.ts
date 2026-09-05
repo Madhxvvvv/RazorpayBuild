@@ -26,3 +26,31 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   text: string;
 }
+
+export type MandateType = "INTENT" | "CART" | "PAYMENT" | "EXECUTION";
+
+export interface MandateRecord {
+  chainId: string;
+  seq: number;
+  type: MandateType;
+  payload: Record<string, unknown>;
+  prevHash: string;
+  hash: string;
+  createdAt: string;
+}
+
+export interface ChainSummary {
+  chainId: string;
+  recordCount: number;
+  lastActivityAt: string;
+  lastType: MandateType;
+  lastResult?: unknown;
+  rawAsk?: string;
+}
+
+export type ChainVerification = { valid: true; length: number } | { valid: false; brokenAtSeq: number; reason: string };
+
+export interface ChainDetail {
+  records: MandateRecord[];
+  verification: ChainVerification;
+}

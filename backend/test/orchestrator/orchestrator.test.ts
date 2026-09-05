@@ -131,6 +131,21 @@ describe("orchestrator.handleMessage", () => {
     expect(razorpayAdapter.createOrder).not.toHaveBeenCalled();
   });
 
+  it("denies a cart when the merchant's kill switch is engaged, without touching Razorpay", async () => {
+    isEngagedMock.mockReturnValue(true);
+    productFindMock.mockReturnValue(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 5 }]),
+    );
+    const runLlmLoop = vi.fn().mockResolvedValue({ type: "propose_cart", items: [{ sku: "FOOD-PBAR-001", qty: 1 }] });
+    const razorpayAdapter = makeRazorpayAdapter();
+    const orchestrator = createOrchestrator({ runLlmLoop, razorpayAdapter });
+
+    const result = await orchestrator.handleMessage({ userId: "user-1", merchantId: "merchant-1", message: "get me a protein bar" });
+
+    expect(result).toEqual({ type: "denied", chainId: expect.any(String), reason: "kill switch engaged" });
+    expect(razorpayAdapter.createOrder).not.toHaveBeenCalled();
+  });
+
   it("on confirmStepUp, reconstructs the cart from the ledger and executes it", async () => {
     const chainId = "chain-fixed";
     getChainMock.mockResolvedValue([

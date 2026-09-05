@@ -1,4 +1,4 @@
-import type { Consent, FailureMode, OrchestratorResult } from "./types";
+import type { ChainDetail, ChainSummary, Consent, FailureMode, MandateRecord, OrchestratorResult } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
@@ -47,4 +47,24 @@ export function sendMessage(input: {
     body: JSON.stringify(body),
     headers: forcedFailure ? { "X-Force-Failure": forcedFailure } : undefined,
   });
+}
+
+export function getChains(limit = 50): Promise<ChainSummary[]> {
+  return request(`/admin/chains?limit=${limit}`);
+}
+
+export function getChainDetail(chainId: string): Promise<ChainDetail> {
+  return request(`/admin/chains/${encodeURIComponent(chainId)}`);
+}
+
+export function getDecisions(limit = 50): Promise<MandateRecord[]> {
+  return request(`/admin/decisions?limit=${limit}`);
+}
+
+export function getKillSwitch(merchantId: string): Promise<{ merchantId: string; engaged: boolean }> {
+  return request(`/admin/kill-switch/${encodeURIComponent(merchantId)}`);
+}
+
+export function setKillSwitch(merchantId: string, engaged: boolean): Promise<{ merchantId: string; engaged: boolean }> {
+  return request("/admin/kill-switch", { method: "POST", body: JSON.stringify({ merchantId, engaged }) });
 }
