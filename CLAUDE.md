@@ -29,6 +29,10 @@ Work one phase at a time. Commit when a phase's own tests pass before starting t
 - LLM: OpenAI API, tool use / function calling (deviates from `docs/` spec, which specifies Claude — see note below)
 - Payments: Razorpay Node SDK, test-mode keys only
 
+## Razorpay integration choice
+
+Direct Node SDK (`razorpay` npm package) against test-mode keys, not the official `razorpay-mcp-server` — the doc's other listed option. Chosen for control/debuggability during solo buildathon development; swapping to the MCP server is listed as a stretch goal in the doc (section 7) and would only require reimplementing `src/razorpay/razorpay.client.ts`, since the rest of the app depends on the `RazorpayAdapter` interface, not the SDK directly.
+
 ## Deviation from docs/
 
 The architecture and context docs specify Claude for the Agent Orchestrator's tool-use loop (and `docs/track1-context.md` leans on the real Razorpay/NPCI-on-Claude pilot as pitch narrative). This project uses **OpenAI** instead — a deliberate choice made outside the doc, not an error. If you're writing the README's architecture-decision section, call this out explicitly rather than silently following the doc's wording.
@@ -40,4 +44,6 @@ Real keys live in `.env.local`, never in code, never in a commit. See `.env.exam
 ## Current phase
 
 <!-- update this line as you progress, e.g. "Phase 2: Policy Engine — in progress" -->
-Phase 1: Catalog service — done (backend scaffolded, 18 SKUs seeded to MongoDB Atlas, `/catalog/feed.json` and `/catalog/agent-meta/:sku` verified live). Phase 2: Policy Engine + Mandate Ledger — not started.
+Phase 1: Catalog service — done (backend scaffolded, 18 SKUs seeded to MongoDB Atlas, `/catalog/feed.json` and `/catalog/agent-meta/:sku` verified live).
+Phase 2: Policy Engine + Mandate Ledger — done (pure `evaluate()` with 9 unit tests; hash-chain logic with 8 unit tests; `verifyChain` CLI and tamper-detection both verified live against Atlas).
+Phase 3: Razorpay Adapter — done (direct Node SDK, dependency-injected client for testability; 11 unit tests on mapping/error-propagation; `createOrder`/`createPaymentLink` verified live against real test-mode Razorpay via a manual ALLOW-only stub of the policy check; `capturePayment`/`refund` covered by mocked-client tests only, pending a real authorized payment id from Phase 4's checkout flow). Phase 4: Agent Orchestrator + Chat UI — not started.

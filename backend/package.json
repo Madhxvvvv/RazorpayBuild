@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "seed": "tsx src/seed/products.seed.ts",
     "verify-chain": "tsx src/ledger/verify-chain.script.ts",
+    "razorpay:live-check": "tsx src/razorpay/live-check.script.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -17,7 +18,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "mongoose": "^8.9.5"
+    "mongoose": "^8.9.5",
+    "razorpay": "^2.9.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
