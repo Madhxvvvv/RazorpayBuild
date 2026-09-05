@@ -1,4 +1,4 @@
-# Agentic Storefront — Track 01 Build
+# Warden — Track 01 Build
 
 Full spec lives in `docs/`. Read the relevant doc before touching a module — don't rely on this file alone.
 
@@ -15,7 +15,7 @@ The LLM never calls Razorpay directly. It only proposes actions (via `search_cat
 2. Policy Engine — pure functions, unit-tested, zero LLM/network calls
 3. Mandate Ledger — hash-chained append-only records + a `verifyChain()` script
 4. Razorpay Adapter — typed wrapper around Orders/Payments/Refunds (test mode only)
-5. Agent Orchestrator — OpenAI tool-use loop, narrow read-heavy tool set
+5. Agent Orchestrator — Groq tool-use loop, narrow read-heavy tool set
 6. Failure Injector — staged decline/out-of-stock/cap-breach + recovery flow
 7. Admin/Audit Dashboard — live ledger view, policy-decision feed, consent revoke
 
@@ -26,7 +26,7 @@ Work one phase at a time. Commit when a phase's own tests pass before starting t
 - Backend: Node.js + TypeScript
 - Frontend: React + TypeScript
 - DB: MongoDB (or in-memory for a fast first pass — confirm which before scaffolding)
-- LLM: Groq API (`llama-3.3-70b-versatile`), via the `openai` SDK pointed at Groq's OpenAI-compatible endpoint — see note below. Deviates from `docs/` spec, which specifies Claude.
+- LLM: Groq API (`openai/gpt-oss-20b`), via the `openai` SDK pointed at Groq's OpenAI-compatible endpoint — see note below. Deviates from `docs/` spec, which specifies Claude.
 - Payments: Razorpay Node SDK, test-mode keys only
 
 ## Razorpay integration choice
@@ -39,7 +39,9 @@ The architecture and context docs specify Claude for the Agent Orchestrator's to
 
 ## LLM provider: OpenAI → Groq swap
 
-Originally built against OpenAI (`gpt-4o-mini`). Swapped to **Groq** (`llama-3.3-70b-versatile`) because Groq's free tier (no credit card, 14,400 requests/day) comfortably covers demo/dev usage, versus OpenAI requiring paid billing credits. Groq's API is OpenAI-SDK-compatible, so the swap was small and contained: `backend/src/orchestrator/groq-client.ts` replaces the old `openai-client.ts` (same `openai` npm package, just pointed at `https://api.groq.com/openai/v1` with a `GROQ_API_KEY`), and `server.ts` was updated to use it. `orchestrator/llm-loop.ts` and `tools.ts` needed **zero changes** — they only depend on the OpenAI SDK's types, not on OpenAI's API being the actual backend, which is exactly what made this swap cheap. Known tradeoff: open-weight models are somewhat less consistent than GPT-4o-mini at strictly following a tool-call JSON schema every time — worth watching for occasional malformed/skipped tool calls during the live demo. Env var is now `GROQ_API_KEY` (+ optional `GROQ_MODEL`, defaults to `llama-3.3-70b-versatile`) — `OPENAI_API_KEY`/`OPENAI_MODEL` are no longer read anywhere.
+Originally built against OpenAI (`gpt-4o-mini`). Swapped to **Groq** (`openai/gpt-oss-20b`) because Groq's free tier (no credit card, 14,400 requests/day) comfortably covers demo/dev usage, versus OpenAI requiring paid billing credits. Groq's API is OpenAI-SDK-compatible, so the swap was small and contained: `backend/src/orchestrator/groq-client.ts` replaces the old `openai-client.ts` (same `openai` npm package, just pointed at `https://api.groq.com/openai/v1` with a `GROQ_API_KEY`), and `server.ts` was updated to use it. `orchestrator/llm-loop.ts` and `tools.ts` needed **zero changes** — they only depend on the OpenAI SDK's types, not on OpenAI's API being the actual backend, which is exactly what made this swap cheap. Known tradeoff: open-weight models are somewhat less consistent than GPT-4o-mini at strictly following a tool-call JSON schema every time — worth watching for occasional malformed/skipped tool calls during the live demo. Env var is now `GROQ_API_KEY` (+ optional `GROQ_MODEL`, defaults to `openai/gpt-oss-20b`) — `OPENAI_API_KEY`/`OPENAI_MODEL` are no longer read anywhere.
+
+**Model selection, discovered live, not from docs:** `llama-3.3-70b-versatile` (Groq's most commonly documented model at the time this was written) has since been deprecated/removed — confirmed by querying `GET https://api.groq.com/openai/v1/models` directly, which is the reliable way to check what's actually available rather than trusting docs/blog posts that go stale. `openai/gpt-oss-120b` is listed as tool-calling-capable but failed live with `400 Tool call validation failed: attempted to call tool 'commentary' which was not in request.tools` — a known quirk of OpenAI's open-weight "Harmony" response format (internal reasoning channels like `commentary`) not translating cleanly through Groq's tool-calling proxy for this app's plain function-calling setup. `openai/gpt-oss-20b` works correctly and is what's wired in now. If Groq changes its catalog again, query the `/models` endpoint first before picking a replacement, and smoke-test tool-calling directly (a bare `chat.completions.create` with one tool) before wiring it into the orchestrator.
 
 ## Secrets
 

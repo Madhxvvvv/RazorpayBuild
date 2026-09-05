@@ -1,4 +1,4 @@
-# Agentic Storefront
+# Warden
 
 A Track 01 (AI Growth & Agentic Commerce) build: a conversational shopping agent that can search a catalog, propose a cart, and execute a real Razorpay test-mode purchase — but never on its own authority. Every money-adjacent action is decided by a deterministic policy engine and recorded in a tamper-evident, hash-chained ledger before anything is executed.
 
@@ -6,7 +6,7 @@ Full spec and design rationale: [`docs/track1-agentic-storefront-architecture.md
 
 ## The one rule that matters
 
-**The LLM never calls Razorpay directly.** The Agent Orchestrator (a Groq-hosted `llama-3.3-70b-versatile` tool-use loop) can only *propose* — its tool set is `search_catalog`, `get_agent_meta`, `propose_cart`. There is no tool that charges money. Every proposed cart is evaluated by a pure, unit-tested Policy Engine (`backend/src/policy/policy.engine.ts`) — zero model calls, zero network calls — before the Razorpay Adapter is ever invoked. If someone asks "could this thing accidentally spend money it shouldn't?", the answer is: structurally, no — the model has no tool that spends money, and the code path from "model decides" to "money moves" always passes through a plain TypeScript function you can read top to bottom.
+**The LLM never calls Razorpay directly.** The Agent Orchestrator (a Groq-hosted `openai/gpt-oss-20b` tool-use loop) can only *propose* — its tool set is `search_catalog`, `get_agent_meta`, `propose_cart`. There is no tool that charges money. Every proposed cart is evaluated by a pure, unit-tested Policy Engine (`backend/src/policy/policy.engine.ts`) — zero model calls, zero network calls — before the Razorpay Adapter is ever invoked. If someone asks "could this thing accidentally spend money it shouldn't?", the answer is: structurally, no — the model has no tool that spends money, and the code path from "model decides" to "money moves" always passes through a plain TypeScript function you can read top to bottom.
 
 ## Architecture
 
@@ -30,7 +30,7 @@ flowchart TB
 
     subgraph External
         RP["Razorpay Test-Mode APIs<br/>(Orders, Payment Links, Payments, Refunds)"]
-        LLM["Groq API<br/>(llama-3.3-70b-versatile, tool use)"]
+        LLM["Groq API<br/>(openai/gpt-oss-20b, tool use)"]
     end
 
     DB[(MongoDB<br/>products / consents / mandates / orders)]
@@ -103,7 +103,7 @@ sequenceDiagram
 | **Policy Engine** | Pure `evaluate()` — kill switch, revocation, expiry, category allowlist, daily cap, per-transaction cap / step-up. No LLM, no I/O. | `backend/src/policy/` |
 | **Mandate Ledger** | Append-only, hash-chained (`sha256(prevHash + payload + createdAt)`) record of every INTENT → CART → PAYMENT → EXECUTION step. `verifyChain()` walks a chain and proves it hasn't been tampered with. | `backend/src/ledger/` |
 | **Razorpay Adapter** | The only module allowed to talk to Razorpay. Thin typed wrapper (`createOrder`, `capturePayment`, `createPaymentLink`, `refund`) over the direct Node SDK, built against a narrow injectable client interface for testability. | `backend/src/razorpay/` |
-| **Agent Orchestrator** | Groq (`llama-3.3-70b-versatile`) tool-use loop (`search_catalog`, `get_agent_meta`, `propose_cart`) wired through the Policy Engine and Razorpay Adapter, via the OpenAI SDK pointed at Groq's OpenAI-compatible endpoint. | `backend/src/orchestrator/` |
+| **Agent Orchestrator** | Groq (`openai/gpt-oss-20b`) tool-use loop (`search_catalog`, `get_agent_meta`, `propose_cart`) wired through the Policy Engine and Razorpay Adapter, via the OpenAI SDK pointed at Groq's OpenAI-compatible endpoint. | `backend/src/orchestrator/` |
 | **Failure Injector** | `X-Force-Failure: decline \| out_of_stock \| cap_breach` header (also a dropdown in the Chat UI) — stages one of three failures and their recovery, both written to the ledger as distinct break/resolution records. | `backend/src/orchestrator/failure-injector.ts` |
 | **Consent** | One-time spend authorization (per-txn cap, per-day cap, category allowlist, expiry) — the stand-in for UPI Reserve Pay / NPCI's UAP. | `backend/src/consent/` |
 | **Admin / Audit Dashboard** | Live mandate-ledger table with per-row status chips and one-click chain-integrity verification, a policy-decisions feed, a kill-switch toggle, and consent revoke. | `frontend/src/components/AdminDashboard.tsx` |
@@ -158,7 +158,7 @@ npm run seed-demo-activity              # seeds 5 realistic purchase sessions in
 
 ## Architecture decisions (deviations from `docs/`, made deliberately)
 
-- **Groq instead of Claude** for the Agent Orchestrator's tool-use loop (originally built against OpenAI, then swapped to Groq's free tier — see CLAUDE.md for the swap details). The spec docs specify Claude (and lean on the real Razorpay/NPCI-on-Claude pilot as pitch narrative) — this project uses Groq's `llama-3.3-70b-versatile` instead, via the OpenAI SDK pointed at Groq's OpenAI-compatible endpoint.
+- **Groq instead of Claude** for the Agent Orchestrator's tool-use loop (originally built against OpenAI, then swapped to Groq's free tier — see CLAUDE.md for the swap details). The spec docs specify Claude (and lean on the real Razorpay/NPCI-on-Claude pilot as pitch narrative) — this project uses Groq's `openai/gpt-oss-20b` instead, via the OpenAI SDK pointed at Groq's OpenAI-compatible endpoint.
 - **Direct Razorpay Node SDK instead of `razorpay-mcp-server`.** Chosen for control and debuggability during solo development. The app depends only on the `RazorpayAdapter` interface, so swapping the client implementation later doesn't touch the rest of the codebase.
 - **Payment Links instead of embedded Checkout.js capture** — see "Divergence from the original spec" above.
 

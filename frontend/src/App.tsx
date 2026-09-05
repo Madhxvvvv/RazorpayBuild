@@ -26,7 +26,7 @@ function App() {
       <header>
         <div className="brand-row">
           <span className="brand-mark" aria-hidden="true" />
-          <h1>Agentic Storefront</h1>
+          <h1>Warden</h1>
         </div>
         <p className="hint">Track 01 demo — {USER_ID} shopping at {MERCHANT_ID}</p>
         <nav className="tabs">

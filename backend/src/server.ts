@@ -19,7 +19,7 @@ dotenv.config({ path: resolve(__dirname, "../../.env.local"), override: true });
 
 const PORT = Number(process.env.PORT ?? 4000);
 const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://localhost:27017/agentic-storefront";
-const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL ?? "openai/gpt-oss-20b";
 
 const app = express();
 app.use(cors());

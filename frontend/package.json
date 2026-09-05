@@ -1,5 +1,5 @@
 {
-  "name": "frontend",
+  "name": "warden-storefront",
   "private": true,
   "version": "0.0.0",
   "type": "module",
