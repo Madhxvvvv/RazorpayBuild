@@ -7,6 +7,7 @@ const getDayTotalInPaiseMock = vi.fn();
 const recordOrderMock = vi.fn();
 const isEngagedMock = vi.fn();
 const productFindMock = vi.fn();
+const findInStockAlternativeMock = vi.fn();
 
 vi.mock("../../src/consent/consent.service.js", () => ({ getConsent: getConsentMock }));
 vi.mock("../../src/ledger/ledger.service.js", () => ({
@@ -19,6 +20,7 @@ vi.mock("../../src/orders/orders.service.js", () => ({
 }));
 vi.mock("../../src/policy/kill-switch.js", () => ({ isEngaged: isEngagedMock }));
 vi.mock("../../src/db/models/Product.js", () => ({ Product: { find: productFindMock } }));
+vi.mock("../../src/catalog/catalog.service.js", () => ({ findInStockAlternative: findInStockAlternativeMock }));
 
 const { createOrchestrator } = await import("../../src/orchestrator/orchestrator.js");
 
@@ -156,5 +158,107 @@ describe("orchestrator.handleMessage", () => {
 
     expect(result).toMatchObject({ type: "executed", chainId, razorpayOrderId: "order_1" });
     expect(razorpayAdapter.createOrder).toHaveBeenCalledWith(60000, "INR", expect.any(String));
+  });
+});
+
+describe("orchestrator.handleMessage — Failure Injector", () => {
+  it("cap_breach: forces STEP_UP regardless of the item's real price", async () => {
+    productFindMock.mockReturnValue(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 5 }]),
+    );
+    const runLlmLoop = vi.fn().mockResolvedValue({ type: "propose_cart", items: [{ sku: "FOOD-PBAR-001", qty: 1 }] });
+    const razorpayAdapter = makeRazorpayAdapter();
+    const orchestrator = createOrchestrator({ runLlmLoop, razorpayAdapter });
+
+    const result = await orchestrator.handleMessage({
+      userId: "user-1",
+      merchantId: "merchant-1",
+      message: "get me a protein bar",
+      forcedFailure: "cap_breach",
+    });
+
+    expect(result.type).toBe("step_up");
+    if (result.type === "step_up") {
+      expect(result.totalInPaise).toBeGreaterThan(CONSENT.spendCapPerTxn);
+    }
+    expect(razorpayAdapter.createOrder).not.toHaveBeenCalled();
+
+    const cartCall = appendMandateMock.mock.calls.find((call) => call[1] === "CART");
+    expect(cartCall?.[2]).toMatchObject({ forcedFailure: "cap_breach" });
+  });
+
+  it("decline: writes a break EXECUTION record, then still succeeds via the (real) retry", async () => {
+    productFindMock.mockReturnValue(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 5 }]),
+    );
+    const runLlmLoop = vi.fn().mockResolvedValue({ type: "propose_cart", items: [{ sku: "FOOD-PBAR-001", qty: 1 }] });
+    const razorpayAdapter = makeRazorpayAdapter();
+    const orchestrator = createOrchestrator({ runLlmLoop, razorpayAdapter });
+
+    const result = await orchestrator.handleMessage({
+      userId: "user-1",
+      merchantId: "merchant-1",
+      message: "get me a protein bar",
+      forcedFailure: "decline",
+    });
+
+    expect(result).toMatchObject({ type: "executed", razorpayOrderId: "order_1" });
+    expect(result.type === "executed" && result.note).toMatch(/declined/);
+
+    const mandateTypes = appendMandateMock.mock.calls.map((call) => call[1]);
+    expect(mandateTypes).toEqual(["INTENT", "CART", "EXECUTION", "PAYMENT", "EXECUTION"]);
+    const breakRecord = appendMandateMock.mock.calls[2];
+    expect(breakRecord[2]).toMatchObject({ result: "razorpay_declined" });
+  });
+
+  it("out_of_stock: writes a break record, substitutes an in-stock item, and executes it", async () => {
+    productFindMock.mockReturnValue(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 0 }]),
+    );
+    findInStockAlternativeMock.mockResolvedValue({ sku: "FOOD-PBAR-002", name: "Chocolate Protein Bar", priceInPaise: 9900, category: "food", stock: 10 });
+    // second lookupProducts call (for the substitute sku)
+    productFindMock.mockReturnValueOnce(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 0 }]),
+    ).mockReturnValueOnce(
+      makeProductQuery([{ sku: "FOOD-PBAR-002", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 10 }]),
+    );
+    const runLlmLoop = vi.fn().mockResolvedValue({ type: "propose_cart", items: [{ sku: "FOOD-PBAR-001", qty: 1 }] });
+    const razorpayAdapter = makeRazorpayAdapter();
+    const orchestrator = createOrchestrator({ runLlmLoop, razorpayAdapter });
+
+    const result = await orchestrator.handleMessage({
+      userId: "user-1",
+      merchantId: "merchant-1",
+      message: "get me a protein bar",
+      forcedFailure: "out_of_stock",
+    });
+
+    expect(result).toMatchObject({ type: "executed" });
+    expect(result.type === "executed" && result.note).toMatch(/FOOD-PBAR-002/);
+
+    const mandateTypes = appendMandateMock.mock.calls.map((call) => call[1]);
+    expect(mandateTypes).toEqual(["INTENT", "EXECUTION", "CART", "PAYMENT", "EXECUTION"]);
+    const breakRecord = appendMandateMock.mock.calls[1];
+    expect(breakRecord[2]).toMatchObject({ result: "out_of_stock", sku: "FOOD-PBAR-001" });
+  });
+
+  it("out_of_stock: denies gracefully when no substitute exists", async () => {
+    productFindMock.mockReturnValue(
+      makeProductQuery([{ sku: "FOOD-PBAR-001", category: "food", priceInPaise: 9900, maxQtyPerOrder: 10, stock: 0 }]),
+    );
+    findInStockAlternativeMock.mockResolvedValue(null);
+    const runLlmLoop = vi.fn().mockResolvedValue({ type: "propose_cart", items: [{ sku: "FOOD-PBAR-001", qty: 1 }] });
+    const razorpayAdapter = makeRazorpayAdapter();
+    const orchestrator = createOrchestrator({ runLlmLoop, razorpayAdapter });
+
+    const result = await orchestrator.handleMessage({
+      userId: "user-1",
+      merchantId: "merchant-1",
+      message: "get me a protein bar",
+      forcedFailure: "out_of_stock",
+    });
+
+    expect(result).toMatchObject({ type: "denied" });
+    expect(razorpayAdapter.createOrder).not.toHaveBeenCalled();
   });
 });

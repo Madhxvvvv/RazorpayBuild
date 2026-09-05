@@ -1,11 +1,11 @@
-import type { Consent, OrchestratorResult } from "./types";
+import type { Consent, FailureMode, OrchestratorResult } from "./types";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -39,6 +39,12 @@ export function sendMessage(input: {
   chainId?: string;
   message: string;
   confirmStepUp?: boolean;
+  forcedFailure?: FailureMode;
 }): Promise<OrchestratorResult> {
-  return request("/orchestrator/message", { method: "POST", body: JSON.stringify(input) });
+  const { forcedFailure, ...body } = input;
+  return request("/orchestrator/message", {
+    method: "POST",
+    body: JSON.stringify(body),
+    headers: forcedFailure ? { "X-Force-Failure": forcedFailure } : undefined,
+  });
 }

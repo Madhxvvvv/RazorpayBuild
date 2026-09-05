@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { sendMessage } from "../lib/api";
-import type { ChatMessage, Consent, OrchestratorResult, ProposedCartItem } from "../lib/types";
+import type { ChatMessage, Consent, FailureMode, OrchestratorResult, ProposedCartItem } from "../lib/types";
 
 interface Props {
   userId: string;
@@ -8,21 +8,31 @@ interface Props {
   consent: Consent | null;
 }
 
+const FAILURE_MODE_OPTIONS: Array<{ value: FailureMode | ""; label: string }> = [
+  { value: "", label: "None" },
+  { value: "out_of_stock", label: "Force: out of stock" },
+  { value: "decline", label: "Force: payment decline" },
+  { value: "cap_breach", label: "Force: over spending cap" },
+];
+
 function formatRupees(paise: number): string {
   return `₹${(paise / 100).toFixed(2)}`;
 }
 
 function resultToMessage(result: OrchestratorResult): string {
-  switch (result.type) {
-    case "reply":
-      return result.text;
-    case "denied":
-      return `I can't do that — ${result.reason}.`;
-    case "step_up":
-      return `That's ${formatRupees(result.totalInPaise)}, above your auto-approve limit (${result.reason}). Confirm to proceed?`;
-    case "executed":
-      return `Done — order ${result.razorpayOrderId} for ${formatRupees(result.amountInPaise)}. Pay here to complete: ${result.paymentLinkUrl}`;
-  }
+  const base = (() => {
+    switch (result.type) {
+      case "reply":
+        return result.text;
+      case "denied":
+        return `I can't do that — ${result.reason}.`;
+      case "step_up":
+        return `That's ${formatRupees(result.totalInPaise)}, above your auto-approve limit (${result.reason}). Confirm to proceed?`;
+      case "executed":
+        return `Done — order ${result.razorpayOrderId} for ${formatRupees(result.amountInPaise)}. Pay here to complete: ${result.paymentLinkUrl}`;
+    }
+  })();
+  return result.note ? `${result.note}\n\n${base}` : base;
 }
 
 export function Chat({ userId, merchantId, consent }: Props) {
@@ -31,6 +41,7 @@ export function Chat({ userId, merchantId, consent }: Props) {
   const [chainId, setChainId] = useState<string | undefined>(undefined);
   const [pendingStepUp, setPendingStepUp] = useState<{ chainId: string; items: ProposedCartItem[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [forcedFailure, setForcedFailure] = useState<FailureMode | "">("");
 
   function pushMessage(role: ChatMessage["role"], text: string) {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role, text }]);
@@ -64,8 +75,10 @@ export function Chat({ userId, merchantId, consent }: Props) {
         chainId: confirmStepUp ? pendingStepUp?.chainId : chainId,
         message: text,
         confirmStepUp,
+        forcedFailure: forcedFailure || undefined,
       });
       handleResult(result);
+      setForcedFailure(""); // one-shot per request, mirrors the backend's per-request injection
     } catch (err) {
       pushMessage("system", `Something went wrong: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -75,7 +88,19 @@ export function Chat({ userId, merchantId, consent }: Props) {
 
   return (
     <div className="panel chat-panel">
-      <h2>Chat</h2>
+      <div className="chat-header">
+        <h2>Chat</h2>
+        <label className="failure-select">
+          Demo failure
+          <select value={forcedFailure} onChange={(e) => setForcedFailure(e.target.value as FailureMode | "")}>
+            {FAILURE_MODE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <div className="chat-log">
         {messages.length === 0 && <p className="hint">Try: "order me a protein bar under 300 rupees"</p>}
         {messages.map((m) => (

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../async-handler.js";
+import { parseFailureMode } from "./failure-injector.js";
 import type { createOrchestrator } from "./orchestrator.js";
 
 export function buildOrchestratorRouter(orchestrator: ReturnType<typeof createOrchestrator>): Router {
@@ -20,6 +21,7 @@ export function buildOrchestratorRouter(orchestrator: ReturnType<typeof createOr
         chainId,
         message,
         confirmStepUp: Boolean(confirmStepUp),
+        forcedFailure: parseFailureMode(req.header("X-Force-Failure")),
       });
       res.json(result);
     }),

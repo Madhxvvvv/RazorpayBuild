@@ -68,6 +68,16 @@ export async function searchProducts(query: string, maxPriceInPaise?: number): P
   }));
 }
 
+/** Used by the Failure Injector's out_of_stock recovery: find another in-stock item in the same category. */
+export async function findInStockAlternative(
+  category: string,
+  excludeSku: string,
+): Promise<CatalogSearchResult | null> {
+  const doc = await Product.findOne({ category, sku: { $ne: excludeSku }, stock: { $gt: 0 } }).lean();
+  if (!doc) return null;
+  return { sku: doc.sku, name: doc.name, priceInPaise: doc.priceInPaise, category: doc.category, stock: doc.stock };
+}
+
 export async function getAgentMeta(sku: string): Promise<AgentMeta | null> {
   const product = await Product.findOne({ sku }).lean();
   if (!product) return null;
