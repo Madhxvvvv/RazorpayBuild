@@ -11,7 +11,7 @@ import { createLiveRazorpayClient } from "./razorpay.client.js";
 import { createRazorpayAdapter } from "./razorpay.adapter.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, "../../../.env.local") });
+dotenv.config({ path: resolve(__dirname, "../../../.env.local"), override: true });
 
 const policyStub = { decision: "ALLOW" } as const;
 

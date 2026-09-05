@@ -16,7 +16,7 @@ import { createOrchestrator } from "./orchestrator.js";
 import type { LlmLoopResult } from "./llm-loop.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, "../../../.env.local") });
+dotenv.config({ path: resolve(__dirname, "../../../.env.local"), override: true });
 
 const USER_ID = "user-1";
 const MERCHANT_ID = "merchant-1";

@@ -5,7 +5,7 @@ import { connectDb, disconnectDb } from "../db/connection.js";
 import { verifyChain } from "./ledger.service.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: resolve(__dirname, "../../../.env.local") });
+dotenv.config({ path: resolve(__dirname, "../../../.env.local"), override: true });
 
 const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://localhost:27017/agentic-storefront";
 
