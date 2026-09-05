@@ -736,6 +736,60 @@ button:focus-visible {
   border-left-color: var(--accent-border);
 }
 
+/* The payoff moment: whichever policy outcome just landed (ALLOW execution,
+   DENY, or STEP_UP) should visibly outweigh everything static on the page,
+   including the Mandate Authorization panel. Colored border + glow ring +
+   an enlarged badge + a more deliberate entrance than the rest of the log. */
+.outcome-card {
+  border-width: 1.5px;
+  border-left-width: 1.5px;
+  padding: 16px 18px;
+  animation: outcome-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.outcome-card .chip {
+  font-size: 13px;
+  padding: 6px 14px;
+}
+
+.outcome-allow {
+  border-color: var(--allow);
+  box-shadow: 0 0 0 4px var(--allow-tint), var(--shadow);
+}
+
+.outcome-allow .record-kind {
+  color: var(--allow);
+}
+
+.outcome-deny {
+  border-color: var(--deny);
+  box-shadow: 0 0 0 4px var(--deny-tint), var(--shadow);
+}
+
+.outcome-deny .record-kind {
+  color: var(--deny);
+}
+
+.outcome-stepup {
+  border-color: var(--stepup);
+  box-shadow: 0 0 0 4px var(--stepup-tint), var(--shadow);
+}
+
+.outcome-stepup .record-kind {
+  color: var(--stepup);
+}
+
+@keyframes outcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .working-dots {
   display: inline-flex;
   gap: 3px;
@@ -1263,4 +1317,48 @@ tbody tr.selected {
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   padding: 1px 6px;
+}
+
+/* ============================================================
+   Storefront — recent activity strip (fills the dead space below
+   the two main panels; quiet by design, it's a glance-back, not
+   a focal point)
+   ============================================================ */
+.activity-strip {
+  gap: 12px;
+}
+
+.activity-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.activity-card {
+  flex: 0 0 auto;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+}
+
+.activity-ask {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.activity-time {
+  font-size: 11px;
+  color: var(--text-faint);
 }

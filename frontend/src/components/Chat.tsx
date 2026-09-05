@@ -10,6 +10,7 @@ interface Props {
   consent: Consent | null;
   forcedFailure: FailureMode | "";
   onConsumeForcedFailure: () => void;
+  onActivity: () => void;
 }
 
 type LogEntry =
@@ -84,7 +85,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
 
   if (result.type === "denied") {
     return (
-      <div className="record-card log-enter">
+      <div className="record-card outcome-card outcome-deny">
         <div className="record-card-header">
           <span className="record-kind">POLICY CHECK</span>
           <StatusChip status="deny" />
@@ -97,7 +98,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
 
   if (result.type === "step_up") {
     return (
-      <div className="record-card log-enter">
+      <div className="record-card outcome-card outcome-stepup">
         <div className="record-card-header">
           <span className="record-kind">POLICY CHECK</span>
           <StatusChip status="step_up" />
@@ -124,9 +125,11 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
     );
   }
 
-  // executed
+  // executed — the payoff moment: a completed, policy-cleared purchase. This
+  // is "the proof," so it gets the most visual weight of anything the chat
+  // renders, not just another record card.
   return (
-    <div className="record-card log-enter">
+    <div className="record-card outcome-card outcome-allow">
       <div className="record-card-header">
         <span className="record-kind">EXECUTION</span>
         <StatusChip status="allow" />
@@ -157,7 +160,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
   );
 }
 
-export function Chat({ userId, merchantId, consent, forcedFailure, onConsumeForcedFailure }: Props) {
+export function Chat({ userId, merchantId, consent, forcedFailure, onConsumeForcedFailure, onActivity }: Props) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [chainId, setChainId] = useState<string | undefined>(undefined);
@@ -197,6 +200,7 @@ export function Chat({ userId, merchantId, consent, forcedFailure, onConsumeForc
       push({ kind: "result", id: crypto.randomUUID(), result });
       setPendingStepUp(result.type === "step_up" ? { chainId: result.chainId } : null);
       onConsumeForcedFailure();
+      onActivity();
     } catch (err) {
       push({ kind: "system", id: crypto.randomUUID(), text: `Something went wrong: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
