@@ -37,6 +37,37 @@ export async function getCatalogFeed(): Promise<CatalogFeed> {
   };
 }
 
+export interface CatalogSearchResult {
+  sku: string;
+  name: string;
+  priceInPaise: number;
+  category: string;
+  stock: number;
+}
+
+/** Used by the orchestrator's search_catalog tool — deliberately read-only and narrow. */
+export async function searchProducts(query: string, maxPriceInPaise?: number): Promise<CatalogSearchResult[]> {
+  const terms = query.split(/\s+/).filter(Boolean);
+  const pattern = terms.length > 0 ? terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") : ".*";
+  const regex = new RegExp(pattern, "i");
+
+  const filter: Record<string, unknown> = {
+    $or: [{ name: regex }, { description: regex }, { category: regex }, { categoryTags: regex }],
+  };
+  if (typeof maxPriceInPaise === "number") {
+    filter.priceInPaise = { $lte: maxPriceInPaise };
+  }
+
+  const products = await Product.find(filter).limit(10).lean();
+  return products.map((p) => ({
+    sku: p.sku,
+    name: p.name,
+    priceInPaise: p.priceInPaise,
+    category: p.category,
+    stock: p.stock,
+  }));
+}
+
 export async function getAgentMeta(sku: string): Promise<AgentMeta | null> {
   const product = await Product.findOne({ sku }).lean();
   if (!product) return null;
