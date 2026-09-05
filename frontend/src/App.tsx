@@ -4,16 +4,17 @@ import { ConsentSetup } from "./components/ConsentSetup";
 import { Chat } from "./components/Chat";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { getConsent } from "./lib/api";
-import type { Consent } from "./lib/types";
+import type { Consent, FailureMode } from "./lib/types";
 
-const USER_ID = "user-1";
-const MERCHANT_ID = "merchant-1";
+const USER_ID = "Aditi Verma";
+const MERCHANT_ID = "GreenCart";
 
 type Tab = "storefront" | "admin";
 
 function App() {
   const [consent, setConsent] = useState<Consent | null>(null);
   const [tab, setTab] = useState<Tab>("storefront");
+  const [forcedFailure, setForcedFailure] = useState<FailureMode | "">("");
 
   useEffect(() => {
     getConsent(USER_ID, MERCHANT_ID)
@@ -24,11 +25,11 @@ function App() {
   return (
     <div className="app">
       <header>
-        <div className="brand-row">
-          <span className="brand-mark" aria-hidden="true" />
-          <h1>Warden</h1>
+        <div className="wordmark">
+          <span className="wordmark-glyph" aria-hidden="true" />
+          <span className="wordmark-text">Warden</span>
         </div>
-        <p className="hint">Track 01 demo — {USER_ID} shopping at {MERCHANT_ID}</p>
+        <p className="tagline">Every purchase your shopping agent makes — bounded by policy, logged, and provable.</p>
         <nav className="tabs">
           <button className={tab === "storefront" ? "active" : ""} onClick={() => setTab("storefront")}>
             Storefront
@@ -41,10 +42,21 @@ function App() {
       {tab === "storefront" ? (
         <main>
           <ConsentSetup userId={USER_ID} merchantId={MERCHANT_ID} consent={consent} onConsentChange={setConsent} />
-          <Chat userId={USER_ID} merchantId={MERCHANT_ID} consent={consent} />
+          <Chat
+            userId={USER_ID}
+            merchantId={MERCHANT_ID}
+            consent={consent}
+            forcedFailure={forcedFailure}
+            onConsumeForcedFailure={() => setForcedFailure("")}
+          />
         </main>
       ) : (
-        <AdminDashboard userId={USER_ID} merchantId={MERCHANT_ID} />
+        <AdminDashboard
+          userId={USER_ID}
+          merchantId={MERCHANT_ID}
+          forcedFailure={forcedFailure}
+          onForcedFailureChange={setForcedFailure}
+        />
       )}
     </div>
   );

@@ -8,6 +8,8 @@ interface Props {
   userId: string;
   merchantId: string;
   consent: Consent | null;
+  forcedFailure: FailureMode | "";
+  onConsumeForcedFailure: () => void;
 }
 
 type LogEntry =
@@ -15,11 +17,10 @@ type LogEntry =
   | { kind: "system"; id: string; text: string }
   | { kind: "result"; id: string; result: OrchestratorResult };
 
-const FAILURE_MODE_OPTIONS: Array<{ value: FailureMode | ""; label: string }> = [
-  { value: "", label: "None" },
-  { value: "out_of_stock", label: "Force: out of stock" },
-  { value: "decline", label: "Force: payment decline" },
-  { value: "cap_breach", label: "Force: over spending cap" },
+const EXAMPLE_PROMPTS = [
+  "Order me a protein bar under 300 rupees",
+  "Get me 2 bags of atta",
+  "Order a cold brew coffee",
 ];
 
 // Presentational only — the backend resolves a message in one round trip and
@@ -31,6 +32,25 @@ function formatRupees(paise: number): string {
   return `₹${(paise / 100).toFixed(2)}`;
 }
 
+function EmptyState({ onPick }: { onPick: (text: string) => void }) {
+  return (
+    <div className="chat-empty">
+      <span className="chat-empty-glyph" aria-hidden="true" />
+      <p className="chat-empty-title">Ask Warden to shop for you</p>
+      <p className="chat-empty-sub">
+        It searches the catalog, proposes a cart, and only ever checks out within your mandate.
+      </p>
+      <div className="chat-empty-examples">
+        {EXAMPLE_PROMPTS.map((example) => (
+          <button key={example} type="button" className="example-chip" onClick={() => onPick(example)}>
+            {example}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WorkingIndicator() {
   const [stage, setStage] = useState(0);
   useEffect(() => {
@@ -38,7 +58,7 @@ function WorkingIndicator() {
     return () => clearInterval(id);
   }, []);
   return (
-    <div className="record-card tool-call working">
+    <div className="record-card tool-call working log-enter">
       <div className="record-card-header">
         <span className="record-kind">TOOL CALL</span>
         <span className="working-dots" aria-hidden="true">
@@ -55,7 +75,7 @@ function WorkingIndicator() {
 function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; onConfirm: () => void; busy: boolean }) {
   if (result.type === "reply") {
     return (
-      <div className="agent-note">
+      <div className="agent-note log-enter">
         <span className="agent-note-label">Agent</span>
         <p>{result.text}</p>
       </div>
@@ -64,7 +84,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
 
   if (result.type === "denied") {
     return (
-      <div className="record-card">
+      <div className="record-card log-enter">
         <div className="record-card-header">
           <span className="record-kind">POLICY CHECK</span>
           <StatusChip status="deny" />
@@ -77,7 +97,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
 
   if (result.type === "step_up") {
     return (
-      <div className="record-card">
+      <div className="record-card log-enter">
         <div className="record-card-header">
           <span className="record-kind">POLICY CHECK</span>
           <StatusChip status="step_up" />
@@ -106,7 +126,7 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
 
   // executed
   return (
-    <div className="record-card">
+    <div className="record-card log-enter">
       <div className="record-card-header">
         <span className="record-kind">EXECUTION</span>
         <StatusChip status="allow" />
@@ -137,13 +157,12 @@ function ResultCard({ result, onConfirm, busy }: { result: OrchestratorResult; o
   );
 }
 
-export function Chat({ userId, merchantId, consent }: Props) {
+export function Chat({ userId, merchantId, consent, forcedFailure, onConsumeForcedFailure }: Props) {
   const [log, setLog] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [chainId, setChainId] = useState<string | undefined>(undefined);
   const [pendingStepUp, setPendingStepUp] = useState<{ chainId: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [forcedFailure, setForcedFailure] = useState<FailureMode | "">("");
   const logEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -154,8 +173,8 @@ export function Chat({ userId, merchantId, consent }: Props) {
     setLog((prev) => [...prev, entry]);
   }
 
-  async function handleSend(confirmStepUp = false) {
-    const text = confirmStepUp ? "Yes, confirm the purchase." : input.trim();
+  async function handleSend(confirmStepUp = false, overrideText?: string) {
+    const text = confirmStepUp ? "Yes, confirm the purchase." : (overrideText ?? input.trim());
     if (!text || busy) return;
     if (!consent || consent.revoked) {
       push({ kind: "system", id: crypto.randomUUID(), text: "Set up consent before chatting — the agent has nothing it's allowed to spend." });
@@ -177,7 +196,7 @@ export function Chat({ userId, merchantId, consent }: Props) {
       setChainId(result.chainId);
       push({ kind: "result", id: crypto.randomUUID(), result });
       setPendingStepUp(result.type === "step_up" ? { chainId: result.chainId } : null);
-      setForcedFailure("");
+      onConsumeForcedFailure();
     } catch (err) {
       push({ kind: "system", id: crypto.randomUUID(), text: `Something went wrong: ${err instanceof Error ? err.message : String(err)}` });
     } finally {
@@ -186,34 +205,24 @@ export function Chat({ userId, merchantId, consent }: Props) {
   }
 
   return (
-    <div className="panel chat-panel">
+    <div className="panel chat-panel lead-panel">
       <div className="panel-header">
         <h2>Chat</h2>
-        <label className="failure-select">
-          Demo failure
-          <select value={forcedFailure} onChange={(e) => setForcedFailure(e.target.value as FailureMode | "")}>
-            {FAILURE_MODE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
       </div>
 
       <div className="chat-log">
-        {log.length === 0 && <p className="hint">Try: "order me a protein bar under 300 rupees"</p>}
+        {log.length === 0 && <EmptyState onPick={(text) => setInput(text)} />}
         {log.map((entry) => {
           if (entry.kind === "user") {
             return (
-              <div key={entry.id} className="user-bubble">
+              <div key={entry.id} className="user-bubble log-enter">
                 {entry.text}
               </div>
             );
           }
           if (entry.kind === "system") {
             return (
-              <div key={entry.id} className="system-note">
+              <div key={entry.id} className="system-note log-enter">
                 {entry.text}
               </div>
             );

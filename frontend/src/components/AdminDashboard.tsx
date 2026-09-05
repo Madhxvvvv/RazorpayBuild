@@ -1,15 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { getChainDetail, getChains, getDecisions, getKillSwitch, revokeConsent, setKillSwitch } from "../lib/api";
 import { StatusChip, type PolicyStatus } from "./StatusChip";
 import { HashChip } from "./HashChip";
-import type { ChainDetail, ChainSummary, MandateRecord } from "../lib/types";
+import type { ChainDetail, ChainSummary, FailureMode, MandateRecord } from "../lib/types";
 
 interface Props {
   userId: string;
   merchantId: string;
+  forcedFailure: FailureMode | "";
+  onForcedFailureChange: (value: FailureMode | "") => void;
 }
 
 const VISIBLE_ROWS = 8;
+
+const FAILURE_MODE_OPTIONS: Array<{ value: FailureMode | ""; label: string }> = [
+  { value: "", label: "None" },
+  { value: "out_of_stock", label: "Force: out of stock" },
+  { value: "decline", label: "Force: payment decline" },
+  { value: "cap_breach", label: "Force: over spending cap" },
+];
+
+const STATUS_VAR: Record<PolicyStatus, string> = {
+  allow: "var(--allow)",
+  deny: "var(--deny)",
+  step_up: "var(--stepup)",
+  neutral: "var(--border-strong)",
+};
 
 function deriveChainStatus(chain: ChainSummary): PolicyStatus {
   if (chain.lastType === "EXECUTION") {
@@ -28,7 +44,11 @@ function deriveDecisionStatus(record: MandateRecord): { status: PolicyStatus; la
   return { status: "neutral", label: result };
 }
 
-export function AdminDashboard({ userId, merchantId }: Props) {
+function statusEdge(status: PolicyStatus): CSSProperties {
+  return { boxShadow: `inset 3px 0 0 ${STATUS_VAR[status]}` };
+}
+
+export function AdminDashboard({ userId, merchantId, forcedFailure, onForcedFailureChange }: Props) {
   const [chains, setChains] = useState<ChainSummary[]>([]);
   const [decisions, setDecisions] = useState<MandateRecord[]>([]);
   const [selectedChainId, setSelectedChainId] = useState<string | null>(null);
@@ -96,7 +116,7 @@ export function AdminDashboard({ userId, merchantId }: Props) {
 
   return (
     <div className="admin">
-      <div className="panel admin-controls">
+      <div className="panel panel-quiet admin-controls">
         <div className="control-group">
           <span className="field-label">Kill switch — {merchantId}</span>
           <div className="control-row">
@@ -123,7 +143,7 @@ export function AdminDashboard({ userId, merchantId }: Props) {
       {error && <p className="error">{error}</p>}
 
       <div className="admin-grid">
-        <div className="panel">
+        <div className="panel panel-lead">
           <div className="panel-header">
             <h2>Mandate ledger</h2>
             <span className="hint">{chains.length} session(s)</span>
@@ -140,21 +160,24 @@ export function AdminDashboard({ userId, merchantId }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {chains.slice(0, VISIBLE_ROWS).map((c) => (
-                  <tr key={c.chainId} onClick={() => selectChain(c.chainId)} className={c.chainId === selectedChainId ? "selected" : ""}>
-                    <td>
-                      <StatusChip status={deriveChainStatus(c)} />
-                    </td>
-                    <td className="truncate-cell" title={c.rawAsk}>
-                      {c.rawAsk ?? "—"}
-                    </td>
-                    <td>
-                      <HashChip value={c.chainId} />
-                    </td>
-                    <td className="mono">{c.recordCount}</td>
-                    <td className="mono">{new Date(c.lastActivityAt).toLocaleTimeString()}</td>
-                  </tr>
-                ))}
+                {chains.slice(0, VISIBLE_ROWS).map((c) => {
+                  const status = deriveChainStatus(c);
+                  return (
+                    <tr key={c.chainId} onClick={() => selectChain(c.chainId)} className={c.chainId === selectedChainId ? "selected" : ""}>
+                      <td style={statusEdge(status)}>
+                        <StatusChip status={status} />
+                      </td>
+                      <td className="truncate-cell" title={c.rawAsk}>
+                        {c.rawAsk ?? "—"}
+                      </td>
+                      <td>
+                        <HashChip value={c.chainId} />
+                      </td>
+                      <td className="mono">{c.recordCount}</td>
+                      <td className="mono">{new Date(c.lastActivityAt).toLocaleTimeString()}</td>
+                    </tr>
+                  );
+                })}
                 {chains.length === 0 && (
                   <tr>
                     <td colSpan={5} className="hint">
@@ -167,7 +190,7 @@ export function AdminDashboard({ userId, merchantId }: Props) {
           </div>
 
           {chainDetail && (
-            <div className="chain-detail">
+            <div className="chain-detail log-enter">
               <div className="chain-integrity">
                 <StatusChip
                   status={chainDetail.verification.valid ? "allow" : "deny"}
@@ -194,7 +217,7 @@ export function AdminDashboard({ userId, merchantId }: Props) {
           )}
         </div>
 
-        <div className="panel">
+        <div className="panel panel-quiet">
           <div className="panel-header">
             <h2>Policy decisions</h2>
             <span className="hint">{decisions.length} recorded</span>
@@ -213,7 +236,7 @@ export function AdminDashboard({ userId, merchantId }: Props) {
                   const { status, label } = deriveDecisionStatus(d);
                   return (
                     <tr key={`${d.chainId}-${d.seq}`}>
-                      <td>
+                      <td style={statusEdge(status)}>
                         <StatusChip status={status} label={label} />
                       </td>
                       <td>
@@ -234,6 +257,29 @@ export function AdminDashboard({ userId, merchantId }: Props) {
             </table>
           </div>
         </div>
+      </div>
+
+      <div className="panel panel-quiet test-controls">
+        <div className="panel-header">
+          <div className="test-controls-title">
+            <h2>Test &amp; demo controls</h2>
+            <span className="test-controls-badge">Internal</span>
+          </div>
+        </div>
+        <p className="hint">
+          Not part of the live product surface — forces one purchase-flow failure so its recovery is visible in the
+          ledger above.
+        </p>
+        <label className="failure-select">
+          Force a failure scenario
+          <select value={forcedFailure} onChange={(e) => onForcedFailureChange(e.target.value as FailureMode | "")}>
+            {FAILURE_MODE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
     </div>
   );

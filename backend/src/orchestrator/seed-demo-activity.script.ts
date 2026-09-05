@@ -18,8 +18,8 @@ import type { LlmLoopResult } from "./llm-loop.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: resolve(__dirname, "../../../.env.local"), override: true });
 
-const USER_ID = "user-1";
-const MERCHANT_ID = "merchant-1";
+const USER_ID = "Aditi Verma";
+const MERCHANT_ID = "GreenCart";
 
 async function main() {
   const MONGODB_URI = process.env.MONGODB_URI ?? "mongodb://localhost:27017/agentic-storefront";

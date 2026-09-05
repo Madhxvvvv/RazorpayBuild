@@ -202,6 +202,24 @@ select {
   }
 }
 
+/* Entrance animation for anything appended live — chat messages, mandate
+   updates. The reduced-motion override above collapses this to an instant
+   appearance rather than disabling it outright. */
+.log-enter {
+  animation: log-in 0.28s ease both;
+}
+
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ============================================================
    Layout shell
    ============================================================ */
@@ -221,19 +239,31 @@ header {
   gap: 14px;
 }
 
-.brand-row {
+.wordmark {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 11px;
 }
 
-.brand-mark {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+.wordmark-glyph {
+  width: 20px;
+  height: 22px;
   background: var(--accent);
-  transform: rotate(45deg);
+  clip-path: polygon(50% 0%, 100% 20%, 100% 58%, 50% 100%, 0% 58%, 0% 20%);
   flex-shrink: 0;
+}
+
+.wordmark-text {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.tagline {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  max-width: 540px;
 }
 
 .hint {
@@ -242,23 +272,27 @@ header {
 }
 
 .tabs {
-  display: flex;
-  gap: 20px;
-  border-bottom: 1px solid var(--border);
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
 }
 
 .tabs button {
   background: transparent;
   border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  padding: 10px 4px;
+  border-radius: 999px;
+  padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  text-transform: none;
+  letter-spacing: normal;
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .tabs button:hover {
@@ -266,8 +300,9 @@ header {
 }
 
 .tabs button.active {
+  background: var(--bg-raised);
   color: var(--text);
-  border-bottom-color: var(--accent);
+  box-shadow: var(--shadow);
 }
 
 main {
@@ -301,6 +336,24 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* Visual hierarchy: not every panel is equally important. Lead panels (the
+   mandate, the chat, the ledger) get real presence; quiet panels (utility
+   controls, secondary feeds) recede so the eye knows where to land first. */
+.panel-lead,
+.lead-panel {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow);
+}
+
+.panel-quiet {
+  background: transparent;
+  box-shadow: none;
+}
+
+.panel-quiet h2 {
+  color: var(--text-faint);
 }
 
 button {
@@ -398,31 +451,26 @@ button:focus-visible {
   white-space: nowrap;
 }
 
-.chip::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
-}
-
+/* Solid fills, not tinted text — status should read at a glance, not require
+   reading the label. --bg-raised is always the opposite lightness of these
+   accent colors (dark in light mode, light in dark mode), so it holds
+   contrast as a fill color in both themes without a separate token. */
 .chip-allow {
-  color: var(--allow);
-  background: var(--allow-tint);
-  border-color: var(--allow-border);
+  color: var(--bg-raised);
+  background: var(--allow);
+  border-color: var(--allow);
 }
 
 .chip-deny {
-  color: var(--deny);
-  background: var(--deny-tint);
-  border-color: var(--deny-border);
+  color: var(--bg-raised);
+  background: var(--deny);
+  border-color: var(--deny);
 }
 
 .chip-stepup {
-  color: var(--stepup);
-  background: var(--stepup-tint);
-  border-color: var(--stepup-border);
+  color: var(--bg-raised);
+  background: var(--stepup);
+  border-color: var(--stepup);
 }
 
 .chip-neutral {
@@ -497,6 +545,82 @@ button:focus-visible {
   max-height: 520px;
   overflow-y: auto;
   padding-right: 2px;
+}
+
+.chat-empty {
+  margin: auto;
+  max-width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 12px;
+}
+
+.chat-empty-glyph {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--accent-border);
+  border-radius: 50%;
+  position: relative;
+}
+
+.chat-empty-glyph::before,
+.chat-empty-glyph::after {
+  content: "";
+  position: absolute;
+  background: var(--accent);
+  border-radius: 1px;
+}
+
+.chat-empty-glyph::before {
+  left: 9px;
+  top: 15px;
+  width: 16px;
+  height: 3px;
+}
+
+.chat-empty-glyph::after {
+  left: 9px;
+  top: 9px;
+  width: 10px;
+  height: 3px;
+}
+
+.chat-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.chat-empty-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.chat-empty-examples {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.example-chip {
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.example-chip:hover {
+  border-color: var(--accent-border);
+  color: var(--text);
 }
 
 .user-bubble {
@@ -705,9 +829,65 @@ button:focus-visible {
   line-height: 1;
 }
 
-.cap-stat input[type="range"] {
+/* Custom-styled range: a real track fill layered behind a transparent native
+   input, so the fill color/width stay under our control while keyboard and
+   pointer interaction stay native. */
+.range-wrap {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.range-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.range-input {
+  position: absolute;
+  inset: -8px 0;
   width: 100%;
-  accent-color: var(--accent);
+  height: 22px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range-input::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 22px;
+}
+
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 2px solid var(--text);
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
+}
+
+.range-input::-moz-range-track {
+  background: transparent;
+  height: 22px;
+}
+
+.range-input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 2px solid var(--text);
+  cursor: pointer;
 }
 
 .category-block {
@@ -750,8 +930,86 @@ button:focus-visible {
   color: var(--accent);
 }
 
+.pill-static {
+  cursor: default;
+}
+
+.category-pills.quiet {
+  gap: 5px;
+}
+
+.category-pills.quiet .pill {
+  font-size: 11px;
+  padding: 3px 9px;
+}
+
 .expiry-field input {
   width: fit-content;
+}
+
+/* ============================================================
+   Status badge — a second, bolder accent system reserved for
+   state that matters (mandate ACTIVE, and reused by the chip
+   family above): solid fill + optional live pulse, not just
+   colored text.
+   ============================================================ */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-badge-active {
+  background: var(--allow);
+  color: var(--bg-raised);
+}
+
+.status-badge-idle {
+  background: var(--neutral-chip-tint);
+  color: var(--neutral-chip);
+  border: 1px solid var(--border-strong);
+}
+
+.status-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: status-pulse-anim 1.6s ease-in-out infinite;
+}
+
+@keyframes status-pulse-anim {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.35);
+  }
+}
+
+.consent-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.consent-compact-row {
+  display: flex;
+  gap: 28px;
+}
+
+.compact-amount {
+  font-size: 22px;
+  font-weight: 500;
 }
 
 .authorize-btn {
@@ -977,4 +1235,32 @@ tbody tr.selected {
   color: var(--text-muted);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Deliberately set apart from the real audit content above it — dashed
+   border reads as "internal tool," not part of the product surface. */
+.test-controls {
+  border-style: dashed;
+  background: var(--panel-alt);
+}
+
+.test-controls-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.test-controls-title h2 {
+  color: var(--text-muted);
+}
+
+.test-controls-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 1px 6px;
 }
